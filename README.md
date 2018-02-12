@@ -12,9 +12,8 @@ www.tomlogan.co.nz
             |- determine_project_properties.R
             |- calculate_completion_probability.R
                 |- calculate_true_completion.R
-                OR
-                |- calc_acpa.R available at https://github.com/tommlogan/acpa
-                
+
+
 ## Steps
 
 1. main
@@ -30,6 +29,11 @@ www.tomlogan.co.nz
     v. repeat
 2. generate projects
     i. generate matrix paths and activities (a 1 indicates that an activity, column, is in the path, row)
+    i. find all paths in the directed acyclic graph
+    i. remove paths which are subpaths of other paths
+    i. draw activity mean (random uniform variable (0,1)) and variance (exponential random variable (4))
+2. generate projects (B)
+    i. generate a binary upper triangular matrix using a parameter for link density
     i. remove paths which are subpaths of other paths
     i. draw activity mean (random uniform variable (0,1)) and variance (exponential random variable (4))
 3. compare strategies
@@ -46,8 +50,8 @@ www.tomlogan.co.nz
 4. on-time completion probability
     * this is either the `calc_acpa` function from the modified PERT paper or the true multivariate normal completion time
     * $P(max(G_1, .., G_n) \leq 0)$ where $G_i$ is the difference between the completion time of path $i$ and the deadline.
-  
-    
+
+
 
 
 #### Citation:
