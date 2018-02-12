@@ -18,11 +18,11 @@ GenerateProjects_A <- function(activity.num, path.num, link.prob){
   path.matrix <- matrix(rbinom(activity.num * path.num, 1, link.prob), path.num, activity.num)
   
   # remove reduntant/dominated paths, i.e. the ones with are included in other paths
-  path.matrix <- removeDominatedPaths(path.matrix, path.num)
+  path.matrix <- RemoveDominatedPaths(path.matrix, path.num)
   
   # assign activity mean and variance
-  activity.means <- runif(path.num, 0, 1)
-  activity.variances <- rexp(path.num, 4)
+  activity.means <- runif(activity.num, 0, 1)
+  activity.variances <- rexp(activity.num, 4)
   
   return(list(path.matrix = path.matrix, means = activity.means, var = activity.variances))
       
