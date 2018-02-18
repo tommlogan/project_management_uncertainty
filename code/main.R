@@ -15,16 +15,18 @@ main <- function(){
   # User defined variables
   activity.num <- 8
   link.prob <- 0.5
-  set.seed(15673)
+  deadline = list(mean = 0, variance = 1)
+  # set.seed(15673)
   
   # import libraries
   library(data.table)
+  library(mvtnorm)
   
   # import functions
   source('code/generate_projects_B.R')
   
   
-  # Generate random projects  
+  # Generate random project 
   projects <- GenerateProjects_B(activity.num, link.prob)
   path.matrix <- projects$path.matrix
   activities <- projects$activities
@@ -37,8 +39,8 @@ main <- function(){
   project <- CalculatePathProperties(path.matrix, activities)
   
   # Determine probability of on-time completion
-  
-  
+  prob.ontime <- CalculateCompletionProbability(project, deadline)
+ 
 }
 
 
@@ -46,13 +48,14 @@ CalculatePathProperties <- function(path.matrix, activities){
   # calculate the properties of each path:
   #   mean
   #   variance
+  #   covariance between paths
   #
   # Return:
   #   data.table of path properties: mean and variance
+  #   cov.matrix is the covariance matrix between paths
   
   # number of paths in project
   path.num <- nrow(path.matrix)
-
   
   # project properties
   path.properties <- data.table(
@@ -79,4 +82,22 @@ CalculatePathProperties <- function(path.matrix, activities){
 }
 
 
-CaculateCompletionProbability <- function(path.properties)
+CalculateCompletionProbability <- function(project, deadline){
+  # Calculate the joint multivariate normal probability of the project finishing on-time
+  #
+  # Return:
+  #   probability of on-time completion
+  
+  # calculate the difference between the paths and the deadlien
+  
+  # covariance
+  difference.covariance <- project$covariance + deadline$variance
+  
+  # path means
+  difference.mean <- unlist(project$properties[,mean]) - deadline$mean
+  
+  # multivariate normal probability
+  prob.ontime <- pmvnorm(upper = 0, mean = difference.mean,   sigma = difference.covariance)
+  
+  return(prob.ontime)
+}

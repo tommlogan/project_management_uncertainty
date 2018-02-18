@@ -45,7 +45,7 @@ www.tomlogan.co.nz
         * calculate mean
         * calculate variance
         * determine covariance
-5. on-time completion probability (call `calculate_completion_probability.R`)
+5. on-time completion probability (call `CalculateCompletionProbability` in `main.R`)
     *  
     * this is either the `calc_acpa` function from the modified PERT paper or the true multivariate normal completion time
     * $P(max(G_1, .., G_n) \leq 0)$ where $G_i$ is the difference between the completion time of path $i$ and the deadline.
