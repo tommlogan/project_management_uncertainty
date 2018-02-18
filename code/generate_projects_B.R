@@ -1,17 +1,18 @@
-GenerateProjects_B <- function(activity.num, path.num, link.prob){
-  # generate uTri binary network
+GenerateProjects_B <- function(activity.num, link.prob){
+  # generate a project using an activity dependence network, modeled as a random upper triangular binary network
   # draw activity mean and standard deviation times
   # 
   # Args:
   #   activity.num: number of activities in the project
-  #   path.num: number of paths in the project
-  #   link.prob: likelihood of an activity being in a path
+  #   link.prob: likelihood of an activity being in a path - this is the density of the upper triangular matrix
   #   
   # Returns:
-  #   
+  #   path matrix indicating which activities are within a path
+  #   list of activity mean and variances
   
   # import libraries
   library(Matrix)
+  library(reshape2)
   
   # generate an activity network. A one indicates that activity on column is dependent/proceeds an acitivity in row.
   incidence.matrix <- matrix(rbinom(activity.num * activity.num, 1, link.prob), activity.num, activity.num)
@@ -23,8 +24,9 @@ GenerateProjects_B <- function(activity.num, path.num, link.prob){
   # assign activity mean and variance
   activity.means <- runif(activity.num, 0, 1)
   activity.variances <- rexp(activity.num, 4)
+  activities <- list(means = activity.means, variances = activity.variances)
   
-  return(list(path.matrix = path.matrix, means = activity.means, var = activity.variances))
+  return(list(path.matrix = path.matrix, activities = activities))
   
 }
 
@@ -61,7 +63,7 @@ FindPaths <- function(incidence.matrix){
   
   
   # remove reduntant/dominated paths, i.e. the ones with are included in other paths
-  path.matrix <- RemoveDominatedPaths(path.matrix, path.num)
+  path.matrix <- RemoveDominatedPaths(path.matrix)
   
   return(path.matrix)
   
@@ -92,9 +94,11 @@ DepthFirstSearch <- function(adj.list, path, paths){
 
 
 
-RemoveDominatedPaths <- function(path.matrix, path.num){
+RemoveDominatedPaths <- function(path.matrix){
   # Remove dominated or redundant paths i.e. those which are already included in other paths
   #
+  
+  path.num <- nrow(path.matrix)
   
   # order rows
   sum.row <- rowSums(path.matrix)
@@ -123,16 +127,10 @@ RemoveDominatedPaths <- function(path.matrix, path.num){
   }
   
   # remove dominated paths
-  path.matrix <- path.matrix[-dominated, ]
+  if (length(dominated) > 0){
+    path.matrix <- path.matrix[-dominated, ]
+  }
   
   return(path.matrix)
 }
-
-
-# debugging
-activity.num <- 5
-path.num <- 5
-link.prob <- 0.5
-
-GenerateProjects_B(activity.num, path.num, link.prob)
 

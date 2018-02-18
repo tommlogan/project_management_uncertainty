@@ -39,15 +39,14 @@ www.tomlogan.co.nz
 3. compare strategies
     i. loop crash strategies
     ii. update activities accordingly
-    iii. determine the path properties (call `determine_path_properties`)
-    iv. calculate probability project completes on time (call `calculate_completion_probability.R`)
-4. determine project properties
+4. determine project properties (call `CalculatePathProperties` in `main.R`)
     i. identify paths from precedence matrix
     ii. loop through paths
         * calculate mean
         * calculate variance
-        * determine correlations
-4. on-time completion probability
+        * determine covariance
+5. on-time completion probability (call `calculate_completion_probability.R`)
+    *  
     * this is either the `calc_acpa` function from the modified PERT paper or the true multivariate normal completion time
     * $P(max(G_1, .., G_n) \leq 0)$ where $G_i$ is the difference between the completion time of path $i$ and the deadline.
 
