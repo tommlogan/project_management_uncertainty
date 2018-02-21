@@ -70,10 +70,10 @@ CalculatePathProperties <- function(path.matrix, activities){
       activities.shared <- which(colSums(path.matrix[c(i,j),])==2)
       sum(activities$variances[activities.shared])
     })
-    cov.matrix[i,(i+1):path.num] <- covs[[1]]
+    cov.matrix[i,(i+1):path.num] <- unlist(covs)
   }
   
-  # reflect the covaraince matrix
+  # reflect the covariance matrix
   cov.matrix[lower.tri(cov.matrix)] <- t(cov.matrix)[lower.tri(cov.matrix)]
   
   # return
