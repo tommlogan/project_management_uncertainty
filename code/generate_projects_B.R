@@ -23,7 +23,8 @@ GenerateProjects_B <- function(activity.num, link.prob){
   
   # assign activity mean and variance
   activity.means <- runif(activity.num, 0, 1)
-  activity.variances <- rexp(activity.num, 4)
+  activity.coefvariation <- runif(activity.num, 0, 1)
+  activity.variances <- (activity.coefvariation * activity.means)^2
   activities <- list(means = activity.means, variances = activity.variances)
   
   return(list(path.matrix = path.matrix, activities = activities))
@@ -59,7 +60,7 @@ FindPaths <- function(incidence.matrix){
   # put into a path-activity matrix
   paths <- stack(setNames(paths, seq_along(paths)))
   path.matrix <- sparseMatrix(as.numeric(paths[,2]), paths[,1], x=1)
-  as.matrix(path.matrix)
+  # as.matrix(path.matrix)
   
   
   # remove reduntant/dominated paths, i.e. the ones with are included in other paths
