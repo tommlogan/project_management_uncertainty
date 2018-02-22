@@ -33,9 +33,9 @@ main <- function(){
   # init results dataframe
   df <- NULL
   # loop activity and precedence density
-  for (i in seq(1,3)){
+  for (i in seq(1,10)){
     activity.num <- sample(5:15,1)
-    link.prob <- runif(1, 0.2, 0.4)
+    link.prob <- runif(1, 0.05, 0.4)
       
     
     # Generate random project 
@@ -270,29 +270,27 @@ Crash.LatenessProbability <- function(activities, crash.number, path.matrix, dea
   # Crash strategy:
   # Crash the activities based on their probability of contributing to late project 
   
-  for (i in seq(1, crash.number)){
-    # Calculate path properties
-    path.num <- nrow(path.matrix)
-    path.properties <- CalculatePathMeanVariance(path.matrix, activities, path.num)
-    
-    # calculate the probability that each path exceeds the deadline
-    difference.mean = unlist(path.properties[,mean]) - deadline$mean
-    difference.sd = sqrt(unlist(path.properties[,variance]) + deadline$variance)
-    probability.late.path <- sapply(seq(1,length(difference.sd)), function(i) pnorm(0, mean = difference.mean[i], sd = difference.sd[i], lower.tail = FALSE))
-    
-    # for each activity, sum the probability of lateness for each path it is on
-    probability.late.activity <- sapply(seq(1,length(activities$means)), function(i) sum(probability.late.path[which(path.matrix[,i]==1)]))
-    
-    # which activity has the highest probability of being late
-    crash.activity <- which.max(probability.late.activity)
-    # if multiple activities have the highest lateness probability, select the one with the largest mean
-    if (length(crash.activity) > 1){
-      crash.activity <- crash.activity[which.max(activities$means[crash.activity])]
-    }
-    
-    # crash the activity (reduce it's mean completion time by 50%)
-    activities$means[crash.activity] <- activities$means[crash.activity]/2
-  }
+  # number of paths
+  path.num <- nrow(path.matrix)
+  activity.num <- length(activities$means)
+  
+  # Calculate path properties
+  path.properties <- CalculatePathMeanVariance(path.matrix, activities, path.num)
+  
+  # calculate the probability that each path exceeds the deadline
+  difference.mean = unlist(path.properties[,mean]) - deadline$mean
+  difference.sd = sqrt(unlist(path.properties[,variance]) + deadline$variance)
+  probability.late.path <- sapply(seq(1,length(difference.sd)), function(i) pnorm(0, mean = difference.mean[i], sd = difference.sd[i], lower.tail = FALSE))
+  
+  # for each activity, sum the probability of lateness for each path it is on
+  probability.late.activity <- sapply(seq(1,activity.num), function(i) sum(probability.late.path[which(path.matrix[,i]==1)]))
+  
+  # which N activity has the highest probability of being late
+  crash.activity <- order(probability.late.activity)[activity.num-seq(0,crash.number-1)]
+
+  # crash the activity (reduce it's mean completion time by 50%)
+  activities$means[crash.activity] <- activities$means[crash.activity]/2
+
   
   return(activities)
 }
