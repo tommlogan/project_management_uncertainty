@@ -26,6 +26,7 @@ main <- function(){
   library(pbapply)
   library(ggplot2)
   library(ggthemes)
+  library(RColorBrewer)
   
   # import functions
   source('code/generate_projects_B.R')
@@ -33,7 +34,7 @@ main <- function(){
   # init results dataframe
   df <- NULL
   # loop activity and precedence density
-  for (i in seq(1,10)){
+  for (i in seq(1,5)){
     activity.num <- sample(5:15,1)
     link.prob <- runif(1, 0.05, 0.4)
       
@@ -52,10 +53,10 @@ main <- function(){
     deadline$mean <- qnorm(deadline$critical.path.percentile, mean = path.properties$mean[[critical.path.index]], sd = sqrt(path.properties$variance[[critical.path.index]]))
     
     # Crash strategies 
-    strategy.names <- c('critical.path', 'probability.lateness')
+    strategy.names <- c('critical.path', 'probability.lateness', 'none')
     
     # loop through the deadline's coefficient of variation, calculate probability of on-time completion
-    results <- pblapply(deadline$coeff.variation, function(CoV) VaryCoefVariation(CoV, deadline, strategy.names, path.matrix, activities, link.prob), cl = number.cores)
+    results <- pblapply(deadline$coeff.variation, function(CoV) VaryCoefVariation(CoV, deadline, strategy.names, path.matrix, activities, link.prob, crash.number), cl = number.cores)
     df <- rbind(df, rbindlist(results, use.names=TRUE, fill=FALSE))
   }
 
@@ -69,7 +70,7 @@ main <- function(){
 }
 
 
-VaryCoefVariation <- function(CoV, deadline, strategy.names, path.matrix, activities, link.prob){
+VaryCoefVariation <- function(CoV, deadline, strategy.names, path.matrix, activities, link.prob, crash.number){
   # calculate the probability of on-time completion with different crashing strategies for a given coefficient of variation in the deadline
   # 
   # Return:
@@ -101,8 +102,10 @@ CalcCrashCompletionProb <- function(crash.strategy, activities, crash.number, pa
   # crash the activity and update the activities list
   if (crash.strategy == 'critical.path'){
     activities <- Crash.CriticalPath(activities, crash.number, path.matrix, deadline)
-  } else {
+  } else if (crash.strategy == 'probability.lateness'){
     activities <- Crash.LatenessProbability(activities, crash.number, path.matrix, deadline)
+  } else if (crash.strategy == 'none'){
+    activities <- Crash.None(activities, crash.number, path.matrix, deadline)
   }
   
   # update the path properties
@@ -190,10 +193,10 @@ PlotRibbon <- function(df, variate.str, strategy.names, log_axis = F){
   # plot the ribbon results
   
   # colors
-  cols <- c("#f45b5b", "#7cb5ec")
+  cols <- brewer.pal(n = length(strategy.names), name = "Set2") 
   names(cols) <- strategy.names
   # setNames(cols) <- strategy.names
-  ltype <- c(1, 2)
+  ltype <- seq(1, length(strategy.names))
   names(ltype) <- strategy.names
 
   # plot  
@@ -211,8 +214,8 @@ PlotRibbon <- function(df, variate.str, strategy.names, log_axis = F){
 
       # plotting
   plt <- plt +
-    xlab(variate.str) +  #Standard deviation for path completion time') + #Mean path completion time') + #Standard deviation between \n mean path completion times ') + #Inter-path correlation') + #
-    ylab('Probability of Completion Before the Deadline') +
+    xlab("Deadline's CoV") +  #Standard deviation for path completion time') + #Mean path completion time') + #Standard deviation between \n mean path completion times ') + #Inter-path correlation') + #
+    ylab('Probability of Completion \n Before the Deadline') +
     scale_y_continuous(breaks = seq(0,1, by = 0.1)) +
     scale_x_continuous(breaks = unique(df[[variate.str]])) +
     scale_colour_manual(name="",values=cols) +
@@ -240,6 +243,13 @@ PlotRibbon <- function(df, variate.str, strategy.names, log_axis = F){
 ###
 # Crash Strategies
 ###
+
+Crash.None <- function(activities, crash.number, path.matrix, deadline){
+  # Crash strategy:
+  # Nothing - just as a point of comparison
+
+  return(activities)
+}
 
 Crash.CriticalPath <- function(activities, crash.number, path.matrix, deadline){
   # Crash strategy:
