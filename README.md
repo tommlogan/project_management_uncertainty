@@ -50,7 +50,17 @@ www.tomlogan.co.nz
     * this is either the `calc_acpa` function from the modified PERT paper or the true multivariate normal completion time
     * $P(max(G_1, .., G_n) \leq 0)$ where $G_i$ is the difference between the completion time of path $i$ and the deadline.
 
-
+## Crashing rules:
+1. Crash the critical path
+Calculate a crash reserve (the total amount of crashing we can use): 20% of sum of activity means
+    a. Identify the critical path
+		b. Identify activities on the critical path
+		c. Rank the activities based on
+			i. Their mean time
+		d. Crash the activity
+			i. Reduce mean by 50% or the remaining crashing reserve.
+			ii. Variance remains constant
+Repeat until crashing reserve is depleted.
 
 
 #### Citation:
