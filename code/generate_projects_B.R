@@ -25,7 +25,7 @@ GenerateProjects_B <- function(activity.num, link.prob){
   activity.means <- runif(activity.num, 0, 1)
   activity.coefvariation <- runif(activity.num, 0, 1)
   activity.variances <- (activity.coefvariation * activity.means)^2
-  activities <- list(means = activity.means, variances = activity.variances)
+  activities <- list(means = activity.means, variances = activity.variances, cov = activity.coefvariation)
   
   return(list(path.matrix = path.matrix, activities = activities))
   
