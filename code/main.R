@@ -19,6 +19,7 @@ main <- function(){
   deadline <- list(critical.path.percentile = 0.9, coeff.variation = seq(0,1, 0.1))
   crash.number <- 4
   crashing.reserve <- 1
+  crash.effect.var <- -1
   number.cores <- 11
   
   # import libraries
@@ -35,7 +36,7 @@ main <- function(){
   # init results dataframe
   df <- NULL
   # loop activity and precedence density
-  for (i in seq(1,5)){
+  for (i in seq(1,20)){
     activity.num <- sample(5:10,1)
     link.prob <- runif(1, 0.05, 0.4)
       
@@ -53,10 +54,10 @@ main <- function(){
     deadline$mean <- qnorm(deadline$critical.path.percentile, mean = path.properties$mean[[critical.path.index]], sd = sqrt(path.properties$variance[[critical.path.index]]))
     
     # Crash strategies 
-    strategy.names <- c('none', 'critical.path', 'optimal', 'limiting')
+    strategy.names <- c('brute', 'critical.path', 'heuristic', 'limiting', 'none')
     
     # loop through the deadline's coefficient of variation, calculate probability of on-time completion
-    results <- pblapply(deadline$coeff.variation, function(CoV) VaryCoefVariation(CoV, deadline, strategy.names, path.matrix, activities, link.prob, crashing.reserve), cl = number.cores)
+    results <- pblapply(deadline$coeff.variation, function(CoV) VaryCoefVariation(CoV, deadline, strategy.names, path.matrix, activities, link.prob, crashing.reserve, crash.effect.var), cl = number.cores)
     df <- rbind(df, rbindlist(results, use.names=TRUE, fill=FALSE))
   }
 
@@ -70,7 +71,7 @@ main <- function(){
 }
 
 
-VaryCoefVariation <- function(CoV, deadline, strategy.names, path.matrix, activities, link.prob, crashing.reserve){
+VaryCoefVariation <- function(CoV, deadline, strategy.names, path.matrix, activities, link.prob, crashing.reserve, crash.effect.var){
   # calculate the probability of on-time completion with different crashing strategies for a given coefficient of variation in the deadline
   # 
   # Return:
@@ -81,7 +82,7 @@ VaryCoefVariation <- function(CoV, deadline, strategy.names, path.matrix, activi
   deadline$variance <- (deadline$mean * CoV)**2
   
   # loop through the crash strategies and return probability of on-time completion
-  prob.ontime <- lapply(strategy.names, function(crash.strategy) CalcCrashCompletionProb(crash.strategy, activities, crashing.reserve, path.matrix, deadline))
+  prob.ontime <- lapply(strategy.names, function(crash.strategy) CalcCrashCompletionProb(crash.strategy, activities, crashing.reserve, path.matrix, deadline, crash.effect.var))
   
   # named results
   prob.ontime <- unlist(prob.ontime)
@@ -96,18 +97,20 @@ VaryCoefVariation <- function(CoV, deadline, strategy.names, path.matrix, activi
 }
 
 
-CalcCrashCompletionProb <- function(crash.strategy, activities, crashing.reserve, path.matrix, deadline){
+CalcCrashCompletionProb <- function(crash.strategy, activities, crashing.reserve, path.matrix, deadline, crash.effect.var){
   # calculate the probability of on-time completion using a crashing strategy
   
   # crash the activity and update the activities list
   if (crash.strategy == 'critical.path'){
-    activities <- Crash.CriticalPath(activities, crashing.reserve, path.matrix, deadline)
-  } else if (crash.strategy == 'optimal'){
-    activities <- Crash.Optimal(activities, crashing.reserve, path.matrix, deadline)
+    activities <- Crash.CriticalPath(activities, crashing.reserve, path.matrix, deadline, crash.effect.var)
+  } else if (crash.strategy == 'heuristic'){
+    activities <- Crash.Optimal(activities, crashing.reserve, path.matrix, deadline, crash.effect.var)
   } else if (crash.strategy == 'none'){
     activities <- Crash.None(activities)
   } else if (crash.strategy == 'limiting'){
     activities$means <- activities$means * 0
+  } else if (crash.strategy == 'brute'){
+    activities <- Crash.BruteForce(activities, crashing.reserve, path.matrix, deadline, crash.effect.var)
   }
   
   # update the path properties
@@ -161,6 +164,7 @@ CalculatePathMeanVariance <- function(path.matrix, activities, path.num){
   # Return:
   #   data.table of path properties: mean and variance
 
+  
   # project properties
   path.properties <- data.table(
     mean = lapply(seq(path.num), function(i) sum(activities$means[which(path.matrix[i,]==1)])),
@@ -185,6 +189,10 @@ CalculateCompletionProbability <- function(project, deadline){
   
   # path means
   difference.mean <- unlist(project$properties[,mean]) - deadline$mean
+  
+  # remove paths that have no time
+  difference.mean <- difference.mean[apply(difference.covariance,1,function(difference.covariance) !all(difference.covariance==0))] 
+  difference.covariance <- difference.covariance[apply(difference.covariance,1,function(difference.covariance) !all(difference.covariance==0)),apply(difference.covariance,2,function(difference.covariance) !all(difference.covariance==0))] 
   
   # multivariate normal probability
   prob.ontime <- pmvnorm(upper = 0, mean = difference.mean,   sigma = difference.covariance, algorithm = GenzBretz(abseps = 1e6))
@@ -242,9 +250,9 @@ PlotRibbon <- function(df, variate.str, strategy.names, log_axis = F){
   print(plt)
   
   # save figure
-  fig.width <- 3.25 # inches
+  fig.width <- 3.25 * 3 # inches
   fig.height <- fig.width * (sqrt(5)-1)/2 + 0.67
-  ggsave(paste0('fig/', variate.str, '_vary.pdf'), plot = plt, device = 'pdf', width =  fig.width, height = fig.height , unit = 'in' , dpi = 500) 
+  ggsave(paste0('fig/', format(Sys.time(), "%Y-%m-%d"),'_', variate.str, '-vary.pdf'), plot = plt, device = 'pdf', width =  fig.width, height = fig.height , unit = 'in' , dpi = 500) 
   
 }
 
@@ -261,7 +269,7 @@ Crash.None <- function(activities){
   return(activities)
 }
 
-Crash.CriticalPath <- function(activities, crashing.reserve, path.matrix, deadline){
+Crash.CriticalPath <- function(activities, crashing.reserve, path.matrix, deadline, crash.effect.var){
   # Crash strategy:
   # Crash the activities on the critical path
   
@@ -285,8 +293,11 @@ Crash.CriticalPath <- function(activities, crashing.reserve, path.matrix, deadli
     # activity to crash is the one on the critical path with the largest mean
     crash.activity <- critical.path.activities[which.max(activities$means[critical.path.activities])]
     
-    # crash the activity (reduce it's mean completion time by 50% or what's left in our crash budget)
+    # crash the activity (reduce it's mean completion time by 100% or what's left in our crash budget)
     crash.reduction <- min(activities$means[crash.activity], crashing.reserve)
+    # calculate the activities variances resulting from the crash
+    activities$variances[crash.activity] <- (activities$cov[crash.activity] * (activities$means[crash.activity] - crash.reduction*crash.effect.var))^2
+    # reduce the mean by the crash
     activities$means[crash.activity] <- activities$means[crash.activity] - crash.reduction
     
     # this reduces our crashing reserve
@@ -300,7 +311,7 @@ Crash.CriticalPath <- function(activities, crashing.reserve, path.matrix, deadli
 }
 
 
-Crash.Optimal <- function(activities, crashing.reserve, path.matrix, deadline){
+Crash.Optimal <- function(activities, crashing.reserve, path.matrix, deadline, crash.effect.var){
   # Crash strategy:
   # Crash the activities based on their marginal influence on probability of project being late
   
@@ -329,6 +340,9 @@ Crash.Optimal <- function(activities, crashing.reserve, path.matrix, deadline){
     
     # crash the activity (reduce it's mean completion time by 50% or what's left in our crash budget)
     crash.reduction <- min(activities$means[crash.activity], crashing.reserve)
+    # calculate the activities variances resulting from the crash
+    activities$variances[crash.activity] <- (activities$cov[crash.activity] * (activities$means[crash.activity] - crash.reduction*crash.effect.var))^2
+    # reduce the mean by the crash
     activities$means[crash.activity] <- activities$means[crash.activity] - crash.reduction
     
     # this reduces our crashing reserve
@@ -386,4 +400,69 @@ plotCrashEffect <- function(project, deadline){
   }
   poc <- lapply(reduce.path.mean, function(reduce) CalcPocCrash(reduce, project, deadline, path.idx))
   plot(reduce.path.mean, poc)
+}
+
+
+
+Crash.BruteForce <- function(activities, crashing.reserve, path.matrix, deadline, crash.effect.var){
+  # Crash strategy:
+  # Crash the activities based on their marginal influence on probability of project being late
+  
+  # number of paths
+  path.num <- nrow(path.matrix)
+  activity.num <- length(activities$means)
+  
+  # activity indices
+  activities.index <- seq(1,activity.num)
+  crashed.activities <- c()
+  
+  
+  while (crashing.reserve > 0){
+    # Calculate path properties
+    project <- CalculatePathProperties(path.matrix, activities)
+    
+    # potential crash activities
+    potential.crash.activities <- activities.index[! activities.index %in% crashed.activities]
+    
+    # calculate the effect on completion probability of crashing each activity
+    activity.effect <- unlist(lapply(potential.crash.activities, function(i) ActivityCrashEffect(i, deadline, path.matrix, activities, crash.effect.var)))
+    
+    # crashing which activity will result in highest on-time completion
+    crash.activity <- potential.crash.activities[which.max(activity.effect)]
+
+    # crash the activity (reduce it's mean completion time by 50% or what's left in our crash budget)
+    crash.reduction <- min(activities$means[crash.activity], crashing.reserve)
+    # calculate the activities variances resulting from the crash
+    activities$variances[crash.activity] <- (activities$cov[crash.activity] * (activities$means[crash.activity] - crash.reduction*crash.effect.var))^2
+    # reduce the mean by the crash
+    activities$means[crash.activity] <- activities$means[crash.activity] - crash.reduction
+
+    # this reduces our crashing reserve
+    crashing.reserve <- crashing.reserve - crash.reduction
+    
+    # add crashed path to list, cannot re-crash a path
+    crashed.activities <- c(crashed.activities, crash.activity)
+  }
+  
+  return(activities)
+}
+
+
+ActivityCrashEffect <- function(i, deadline, path.matrix, activities, crash.effect.var){
+  
+  # crash the activity
+  crash.activity <- i
+  crash.reduction <- activities$means[i]
+  # calculate the activities variances resulting from the crash
+  activities$variances[crash.activity] <- (activities$cov[crash.activity] * (activities$means[crash.activity] - crash.reduction*crash.effect.var))^2
+  # reduce the mean by the crash
+  activities$means[crash.activity] <- activities$means[crash.activity] - crash.reduction
+  
+  # recalculate the project information
+  project <- CalculatePathProperties(path.matrix, activities)
+
+  # Determine probability of on-time completion
+  prob <- CalculateCompletionProbability(project, deadline)
+  
+  return(prob)
 }

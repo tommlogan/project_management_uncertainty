@@ -62,5 +62,14 @@ Calculate a crash reserve (the total amount of crashing we can use): 20% of sum 
 			ii. Variance remains constant
 Repeat until crashing reserve is depleted.
 
+2. Probability of lateness
+  a. Calculate the probability that each path is completed before the deadline
+  b. For each activity, calculate the product of the probabilities of its paths completing on-time
+  c. For each activity, subtract this probability from 1. This gives the probability of this activity being on at least one late path.
+  c. Rank by this probability, and if equal, by the mean
+  d. Crash the activity
+    i. Reduce the mean 50%
+    ii. Variance constant
+  Crash the top activities until the crashing reserve is spent.
 
 #### Citation:
