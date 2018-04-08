@@ -70,8 +70,11 @@ main <- function(){
   fwrite(df, file = paste0('data/results/vary_',variate.str,'.csv'))
   
   # plot the results
-  PlotRibbon(df, variate.str, strategy.names, log_axis = F)
+  PlotMean(df, variate.str, strategy.names, log_axis = F)
+  PlotDifference(df, variate.str, strategy.names, log_axis = F)
   
+  # plot the forecast bias caused by not considering deadline uncertainty
+  PlotForecastBias(df, sim_num, strategy.names, variate.str)
 }
 
 
@@ -122,6 +125,8 @@ CalcCrashCompletionProb <- function(crash.strategy, activities, crashing.reserve
   
   # Determine probability of on-time completion
   prob.ontime <- CalculateCompletionProbability(project, deadline) 
+  
+  # return(prob.ontime)
 }
 
 
