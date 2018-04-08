@@ -19,7 +19,7 @@ main <- function(){
   deadline <- list(critical.path.percentile = 0.9, coeff.variation = seq(0,1, 0.1))
   crash.number <- 4
   crashing.reserve <- 1
-  crash.effect.var <- -1
+  crash.effect.var <- -1 #if negative, the variance increases due to crashing
   number.cores <- 11
   
   # import libraries
@@ -29,6 +29,9 @@ main <- function(){
   library(ggplot2)
   library(ggthemes)
   library(RColorBrewer)
+  library(directlabels)
+  library(reshape)
+  
   
   # import functions
   source('code/generate_projects_B.R')
@@ -36,7 +39,8 @@ main <- function(){
   # init results dataframe
   df <- NULL
   # loop activity and precedence density
-  for (i in seq(1,20)){
+  sim_num = 5
+  for (i in seq(1,sim_num)){
     activity.num <- sample(5:10,1)
     link.prob <- runif(1, 0.05, 0.4)
       
@@ -224,13 +228,14 @@ PlotRibbon <- function(df, variate.str, strategy.names, log_axis = F){
       stat_summary(data = df, aes_string(x = variate.str, y = strategy), alpha = 0.2, fill = cols[[i]], geom="ribbon", fun.ymin = function(x) quantile(x, 0.25), fun.ymax = function(x) quantile(x, 0.75)) + 
     # mean
       stat_summary(data = df, aes_string(x = variate.str, y = strategy, color = shQuote(strategy.names[[i]]), linetype = shQuote(strategy.names[[i]])), geom="line", fun.y=median, size = 1)
+      # geom_dl(aes_string(x = variate.str, y = strategy),  method = list(dl.combine("first.points", "last.points"), cex = 0.8))
     # iterate
     i <- i + 1
   }
 
       # plotting
   plt <- plt +
-    xlab("Deadline's CoV") +  #Standard deviation for path completion time') + #Mean path completion time') + #Standard deviation between \n mean path completion times ') + #Inter-path correlation') + #
+    xlab("Deadline's Coefficient of Variation") +  #Standard deviation for path completion time') + #Mean path completion time') + #Standard deviation between \n mean path completion times ') + #Inter-path correlation') + #
     ylab('Probability of Completion \n Before the Deadline') +
     scale_y_continuous(breaks = seq(0,1, by = 0.1)) +
     scale_x_continuous(breaks = unique(df[[variate.str]])) +
@@ -240,7 +245,11 @@ PlotRibbon <- function(df, variate.str, strategy.names, log_axis = F){
       legend.position = "bottom",
       legend.key.width = unit(1,"cm"),
       text = element_text(size = 10)
-    )
+    )   
+    # scale_colour_discrete(guide = 'none') +
+    # scale_x_discrete(expand=c(0, 1)) +
+    # geom_dl(aes(label=strategy), method = list(dl.combine("first.points", "last.points"), cex = 0.8))
+  
   if (log_axis){
     plt <- plt + scale_x_continuous(trans='log10', breaks = unique(df$x.list))
   }
@@ -250,9 +259,220 @@ PlotRibbon <- function(df, variate.str, strategy.names, log_axis = F){
   print(plt)
   
   # save figure
-  fig.width <- 3.25 * 3 # inches
+  fig.width <- 7  #3.25 # inches
   fig.height <- fig.width * (sqrt(5)-1)/2 + 0.67
   ggsave(paste0('fig/', format(Sys.time(), "%Y-%m-%d"),'_', variate.str, '-vary.pdf'), plot = plt, device = 'pdf', width =  fig.width, height = fig.height , unit = 'in' , dpi = 500) 
+  
+}
+
+
+PlotMean <- function(df, variate.str, strategy.names, log_axis = F){
+  # plot the ribbon results
+  
+  # reshape the df 
+  df2 <- melt(df, id.vars=c("CoV", "num_acts",'num_paths','precedence_density'), variable.name = "strategy", value.name = "prob")
+  aggregate(df2$prob, by = list(df2[,c('CoV','strategy')]), mean)
+  mydt.mean <- df2[,lapply(.SD,mean,na.rm=TRUE),by=c(Cov, strategy),.SDcols=colstoavg]
+  df3 <- df2[, lapply(.SD, mean), by = .(CoV, strategy)]
+  
+  # Colorblind palette with black:
+  cbbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+  
+  # colors
+  cols <- cbbPalette[1:length(strategy.names)]
+  names(cols) <- strategy.names
+  # setNames(cols) <- strategy.names
+  ltype <- seq(1, length(strategy.names))
+  names(ltype) <- strategy.names
+  
+  # plot  
+  plt <- ggplot(df3, aes(x = CoV, y = prob, group = strategy, colour = strategy)) + theme_hc()+
+  # stat_summary(aes(group=strategy), fun.y=mean, colour="red", geom="line",group=1)
+  geom_line() + 
+  # stat_summary(data = df, geom="line", fun.y=median, size = 1) + 
+  # scale_colour_discrete(guide = 'none') +
+  # scale_x_discrete(expand=c(0, 1)) +
+  geom_dl(aes(label = strategy), method = list(dl.combine( "last.points"), cex = 0.8), size = 1) 
+  
+
+  
+  # plotting
+  plt <- plt +
+    xlab("Deadline's Coefficient of Variation") +  #Standard deviation for path completion time') + #Mean path completion time') + #Standard deviation between \n mean path completion times ') + #Inter-path correlation') + #
+    ylab('Probability of Completion \n Before the Deadline') +
+    scale_y_continuous(breaks = seq(0,1, by = 0.1)) +
+    scale_x_continuous(breaks = unique(df[[variate.str]]), expand=c(0, 0.1)) +
+    scale_colour_manual(name="",values=cols) +
+    scale_linetype_manual(name = '', values= rep(ltype)) +
+    # expand_limits(0,1.2) + 
+    theme(
+      legend.position = "none",
+      legend.key.width = unit(1,"cm"),
+      text = element_text(size = 10)
+    )   
+  
+  # plot
+  print(plt)
+  
+  # save figure
+  fig.width <- 7  #3.25 # inches
+  fig.height <- fig.width * (sqrt(5)-1)/2 + 0.67
+  ggsave(paste0('fig/', format(Sys.time(), "%Y-%m-%d"),'_', variate.str, '-vary_mean.pdf'), plot = plt, device = 'pdf', width =  fig.width, height = fig.height , unit = 'in' , dpi = 500) 
+  
+}
+
+
+PlotDifference <- function(df, variate.str, strategy.names, log_axis = F){
+  # plot the ribbon results
+  
+  # reshape the df 
+  df$heur_crit <- df$heuristic - df$critical.path
+  df$heur_brute <- df$brute - df$heuristic
+  
+  
+  # Colorblind palette with black:
+  cbbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+  
+  # colors
+  cols <- cbbPalette[1:length(strategy.names)]
+  names(cols) <- strategy.names
+  # setNames(cols) <- strategy.names
+  ltype <- seq(1, length(strategy.names))
+  names(ltype) <- strategy.names
+  
+  i <- 1
+  strategy <- 'heur_crit'
+  # plot  
+  plt <- ggplot() + theme_hc()
+  plt <- plt + 
+    # ribbon
+    stat_summary(data = df, aes_string(x = variate.str, y = 'heur_crit'), alpha = 0.2, fill = cols[[i]], geom="ribbon", fun.ymin = function(x) quantile(x, 0.25), fun.ymax = function(x) quantile(x, 0.75)) + 
+    # mean
+    stat_summary(data = df, aes_string(x = variate.str, y = 'heur_crit', color = shQuote(strategy.names[[i]]), linetype = shQuote(strategy.names[[i]])), geom="line", fun.y=median, size = 1)
+
+  
+  # plotting
+  plt <- plt +
+    xlab("Deadline's Coefficient of Variation") +  #Standard deviation for path completion time') + #Mean path completion time') + #Standard deviation between \n mean path completion times ') + #Inter-path correlation') + #
+    ylab('Difference in Probability') +
+    scale_y_continuous(breaks = seq(0,1, by = 0.1)) +
+    scale_x_continuous(breaks = unique(df[[variate.str]])) +
+    scale_colour_manual(name="",values=cols) +
+    scale_linetype_manual(name = '', values= rep(ltype)) +
+    theme(
+      legend.position = "none",
+      legend.key.width = unit(1,"cm"),
+      text = element_text(size = 10)
+    )
+  
+  
+  # plot
+  print(plt)
+  
+  # save figure
+  fig.width <- 7/2  #3.25 # inches
+  fig.height <- fig.width * (sqrt(5)-1)/2 + 0.67
+  ggsave(paste0('fig/', format(Sys.time(), "%Y-%m-%d"),'_critical.pdf'), plot = plt, device = 'pdf', width =  fig.width, height = fig.height , unit = 'in' , dpi = 500) 
+  
+  
+  ###
+  # Brute
+  ###
+  # plot 
+  plt <- ggplot() + theme_hc()
+  plt <- plt + 
+    # ribbon
+    stat_summary(data = df, aes_string(x = variate.str, y = 'heur_brute'), alpha = 0.2, fill = cols[[i]], geom="ribbon", fun.ymin = function(x) quantile(x, 0.25), fun.ymax = function(x) quantile(x, 0.75)) + 
+    # mean
+    stat_summary(data = df, aes_string(x = variate.str, y = 'heur_brute', color = shQuote(strategy.names[[i]]), linetype = shQuote(strategy.names[[i]])), geom="line", fun.y=median, size = 1)
+  
+  
+  # plotting
+  plt <- plt +
+    xlab("Deadline's Coefficient of Variation") +  #Standard deviation for path completion time') + #Mean path completion time') + #Standard deviation between \n mean path completion times ') + #Inter-path correlation') + #
+    ylab('Difference in Probability') +
+    scale_y_continuous(breaks = seq(0,1, by = 0.1)) +
+    scale_x_continuous(breaks = unique(df[[variate.str]])) +
+    scale_colour_manual(name="",values=cols) +
+    scale_linetype_manual(name = '', values= rep(ltype)) +
+    theme(
+      legend.position = "none",
+      legend.key.width = unit(1,"cm"),
+      text = element_text(size = 10)
+    )
+  
+  
+  # plot
+  print(plt)
+  
+  # save figure
+  fig.width <- 7/2  #3.25 # inches
+  fig.height <- fig.width * (sqrt(5)-1)/2 + 0.67
+  ggsave(paste0('fig/', format(Sys.time(), "%Y-%m-%d"),'_brute.pdf'), plot = plt, device = 'pdf', width =  fig.width, height = fig.height , unit = 'in' , dpi = 500) 
+  
+  
+}
+
+
+
+PlotForecastBias <- function(df, sim_num, strategy.names, variate.str){
+  # calculate forecast bias
+  # for 
+  # get the first prob for each of the sims
+  entry <- dim(df)[1]/sim_num
+  zero_vals <- df[seq(1,dim(df)[1],entry),'none'][[1]]
+  zero_list <- rep(zero_vals, each=entry)
+  
+  df$bias = zero_list - df$none
+  # plot the ribbon results
+  
+  # Colorblind palette with black:
+  cbbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+  
+  # colors
+  cols <- cbbPalette[1:length(strategy.names)]
+  names(cols) <- strategy.names
+  # setNames(cols) <- strategy.names
+  ltype <- seq(1, length(strategy.names))
+  names(ltype) <- strategy.names
+  
+  # plot  
+  plt <- ggplot() + theme_hc()
+  
+  i <- 1
+  # for (strategy in strategy.names){
+  plt <- plt + 
+    # ribbon
+    stat_summary(data = df, aes_string(x = variate.str, y = 'bias'), alpha = 0.2, fill = cols[[i]], geom="ribbon", fun.ymin = function(x) quantile(x, 0.25), fun.ymax = function(x) quantile(x, 0.75)) + 
+    # mean
+    stat_summary(data = df, aes_string(x = variate.str, y = 'bias', color = shQuote(strategy.names[[i]]), linetype = shQuote(strategy.names[[i]])), geom="line", fun.y=median, size = 1)
+    # iterate
+    # i <- i + 1
+  # }
+  
+  # plotting
+  plt <- plt +
+    xlab("Deadline's Coefficient of Variation") +  #Standard deviation for path completion time') + #Mean path completion time') + #Standard deviation between \n mean path completion times ') + #Inter-path correlation') + #
+    ylab('Forecast Bias When \n Ignoring Deadline Uncertainty') +
+    scale_y_continuous(breaks = seq(0,1, by = 0.1)) +
+    scale_x_continuous(breaks = unique(df[[variate.str]])) +
+    scale_colour_manual(name="",values=cols) +
+    scale_linetype_manual(name = '', values= rep(ltype)) +
+    theme(
+      legend.position = "none",
+      legend.key.width = unit(1,"cm"),
+      text = element_text(size = 10)
+    )
+
+  
+  # guides(colour = guide_legend(override.aes = list(size=1)))
+  # plot
+  print(plt)
+  
+  # save figure
+  fig.width <- 7  #3.25 # inches
+  fig.height <- fig.width * (sqrt(5)-1)/2 + 0.67
+  ggsave(paste0('fig/', format(Sys.time(), "%Y-%m-%d"),'_forecast-bias.pdf'), plot = plt, device = 'pdf', width =  fig.width, height = fig.height , unit = 'in' , dpi = 500) 
   
 }
 
