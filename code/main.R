@@ -17,7 +17,7 @@ main <- function(){
   # activity.num <- 8
   # link.prob <- 1/3
   deadline <- list(critical.path.percentile = 0.9, coeff.variation = seq(0,1, 0.1))
-  # crash.number <- 4
+  crash.number <- 4
   crashing.reserve <- 1
   crash.effect.var <- -1 #if negative, the variance increases due to crashing
   number.cores <- 11
@@ -39,9 +39,9 @@ main <- function(){
   # init results dataframe
   df <- NULL
   # loop activity and precedence density
-  sim_num = 50
+  sim_num = 1000
   for (i in seq(1,sim_num)){
-    activity.num <- sample(5:20,1)
+    activity.num <- sample(5:10,1)
     link.prob <- runif(1, 0.05, 0.4)
     # Generate random project 
     path_dim <- NULL
@@ -588,7 +588,7 @@ Crash.Optimal <- function(activities, crashing.reserve, path.matrix, deadline, c
     project <- CalculatePathProperties(path.matrix, activities)
     
     # calculate the first difference for all paths
-    epsi <- 0.1
+    epsi <- 1
     path.marginal.completion.prob <- unlist(lapply(seq(1,path.num), function(i) CalculateMarginalEffect(i, epsi, deadline, project)))
     # act.marginal.pooc <- unlist(lapply(seq(1,activity.num), function(i) CalculateMarginalEffectActivity(i, epsi, deadline, project, path.matrix, activities)))
     # for each activity, 1 - product of the probability of all paths being early = prob of at least one path being late
@@ -648,20 +648,21 @@ CalculateMarginalEffect <- function(path.idx, epsi, deadline, project){
   project.add$properties$mean[[path.idx]] <- project.add$properties$mean[[path.idx]] + epsi
   
   # Determine probability of on-time completion with added epsi
-  prob.ontime.added <- pnorm(q = 0, mean = project.add$properties$mean[[path.idx]], sd = sqrt(project.add$properties$variance[[path.idx]])) #CalculateCompletionProbability(project.add, deadline)
+  prob.ontime.added <- CalculateCompletionProbability(project.add, deadline)
   
   # Determine probability of on-time completion with added epsi
-  prob.ontime.less <- pnorm(q = 0, mean = project.less$properties$mean[[path.idx]], sd = sqrt(project.less$properties$variance[[path.idx]])) #CalculateCompletionProbability(project.less, deadline)
+  prob.ontime.less <- CalculateCompletionProbability(project.less, deadline)
   
   # difference
   first.dif <- (prob.ontime.less - prob.ontime.added)/(2*epsi)
   first.dif[first.dif < 0] <- 0
   
   # first difference divided by standard deviation of path
-  marginal.complete.prob <- first.dif/sqrt(project$properties$variance[[path.idx]])
+  marginal.complete.prob <- first.dif #/sqrt(project$properties$variance[[path.idx]])
   
   return(marginal.complete.prob)
 }
+
 
 
 CalculateMarginalEffectActivity <- function(activity.idx, epsi, deadline, project, path.matrix, activities){
