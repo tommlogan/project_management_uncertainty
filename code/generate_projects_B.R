@@ -1,4 +1,4 @@
-GenerateProjects_B <- function(activity.num, link.prob){
+ GenerateProjects_B <- function(activity.num, link.prob){
   # generate a project using an activity dependence network, modeled as a random upper triangular binary network
   # draw activity mean and standard deviation times
   # 
@@ -13,7 +13,7 @@ GenerateProjects_B <- function(activity.num, link.prob){
   # import libraries
   library(Matrix)
   library(reshape2)
-  
+  library(extraDistr)
   # generate an activity network. A one indicates that activity on column is dependent/proceeds an acitivity in row.
   incidence.matrix <- matrix(rbinom(activity.num * activity.num, 1, link.prob), activity.num, activity.num)
   incidence.matrix[lower.tri(incidence.matrix, T)] <- 0
@@ -23,7 +23,7 @@ GenerateProjects_B <- function(activity.num, link.prob){
   
   # assign activity mean and variance
   activity.means <- runif(activity.num, 0, 1)
-  activity.coefvariation <- runif(activity.num, 0, 1)
+  activity.coefvariation <- rkumar(activity.num, 5, 1) #runif(activity.num, 0, 1)
   activity.variances <- (activity.coefvariation * activity.means)^2
   activities <- list(means = activity.means, variances = activity.variances, cov = activity.coefvariation)
   
@@ -64,7 +64,9 @@ FindPaths <- function(incidence.matrix){
   
   
   # remove reduntant/dominated paths, i.e. the ones with are included in other paths
-  path.matrix <- RemoveDominatedPaths(path.matrix)
+  if (!is.null(dim(path.matrix)[1])){
+    path.matrix <- RemoveDominatedPaths(path.matrix)
+  }
   
   return(path.matrix)
   
