@@ -14,6 +14,7 @@
   library(Matrix)
   library(reshape2)
   library(extraDistr)
+  library(triangle)
   # generate an activity network. A one indicates that activity on column is dependent/proceeds an acitivity in row.
   incidence.matrix <- matrix(rbinom(activity.num * activity.num, 1, link.prob), activity.num, activity.num)
   incidence.matrix[lower.tri(incidence.matrix, T)] <- 0
@@ -23,8 +24,10 @@
   
   # assign activity mean and variance
   activity.means <- runif(activity.num, 0, 1)
-  activity.coefvariation <- rkumar(activity.num, 5, 1) #runif(activity.num, 0, 1)
-  activity.variances <- (activity.coefvariation * activity.means)^2
+  # activity.coefvariation <- runif(activity.num, 0, 1) #rkumar(activity.num, 5, 1) # rtriangle(activity.num, 0, 2, 2)#
+  # activity.variances <- (activity.coefvariation * activity.means)^2
+  activity.variances <- rexp(activity.num, 1.5) #  # abs(rnorm(activity.num, mean = 0.5, sd = 0.1)) #
+  activity.coefvariation <- sqrt(activity.variances)/activity.means
   activities <- list(means = activity.means, variances = activity.variances, cov = activity.coefvariation)
   
   return(list(path.matrix = path.matrix, activities = activities))
@@ -64,9 +67,11 @@ FindPaths <- function(incidence.matrix){
   
   
   # remove reduntant/dominated paths, i.e. the ones with are included in other paths
-  if (!is.null(dim(path.matrix)[1])){
-    path.matrix <- RemoveDominatedPaths(path.matrix)
-  }
+  # path_dim <- dim(path.matrix)[1]
+  # print(path_dim)
+  # if (!is.null(path_dim) && path_dim > 1){
+  path.matrix <- RemoveDominatedPaths(path.matrix)
+  # } 
   
   return(path.matrix)
   
@@ -106,8 +111,12 @@ RemoveDominatedPaths <- function(path.matrix){
   # order rows
   sum.row <- rowSums(path.matrix)
   path.matrix <- path.matrix[sort(sum.row, decreasing = TRUE, index = T)$ix, ]
+  if (is.null(dim(path.matrix))){
+    return(path.matrix)
+  }
   # order columns
   sum.cols <- colSums(path.matrix)
+  
   path.matrix <- path.matrix[, sort(sum.cols, decreasing = TRUE, index = T)$ix]
   
   # loop through the rows and check to see if the subsequent rows are dominated

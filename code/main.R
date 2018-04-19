@@ -19,7 +19,7 @@ main <- function(){
   deadline <- list(critical.path.percentile = 0.9, coeff.variation = seq(0,1, 0.1))
   crash.number <- 4
   crashing.reserve <- 1
-  crash.effect.var <- -1 #if negative, the variance increases due to crashing
+  crash.effect.var <- 0 #if negative, the variance increases due to crashing
   number.cores <- 11
   
   # import libraries
@@ -61,7 +61,7 @@ main <- function(){
     deadline$mean <- qnorm(deadline$critical.path.percentile, mean = path.properties$mean[[critical.path.index]], sd = sqrt(path.properties$variance[[critical.path.index]]))
     
     # Crash strategies 
-    strategy.names <- c('brute', 'critical.path', 'heuristic', 'limiting', 'none')
+    strategy.names <- c('enumerate', 'critical.path', 'heuristic', 'limiting', 'none')
     
     # loop through the deadline's coefficient of variation, calculate probability of on-time completion
     results <- pblapply(deadline$coeff.variation, function(CoV) VaryCoefVariation(CoV, deadline, strategy.names, path.matrix, activities, link.prob, crashing.reserve, crash.effect.var), cl = number.cores)
@@ -71,9 +71,10 @@ main <- function(){
   # save results
   variate.str <- 'CoV'
   fwrite(df, file = paste0('data/results/vary_',variate.str,'.csv'))
-  # df <- fread(paste0('data/results/vary_',variate.str,'.csv'))
+  df <- fread(paste0('data/results/vary_',variate.str,'.csv'))
   # plot the results
   PlotMean(df, variate.str, strategy.names, log_axis = F)
+  PlotMeanRatio(df, variate.str, strategy.names, log_axis = F)
   PlotDifference(df, variate.str, strategy.names, log_axis = F)
   
   # plot the forecast bias caused by not considering deadline uncertainty
@@ -114,12 +115,12 @@ CalcCrashCompletionProb <- function(crash.strategy, activities, crashing.reserve
   if (crash.strategy == 'critical.path'){
     activities <- Crash.CriticalPath(activities, crashing.reserve, path.matrix, deadline, crash.effect.var)
   } else if (crash.strategy == 'heuristic'){
-    activities <- Crash.Optimal(activities, crashing.reserve, path.matrix, deadline, crash.effect.var)
+    activities <- Crash.Optimal(activities, crashing.reserve, path.matrix, deadline, crash.effect.var) #Crash.Heuristic(activities, crashing.reserve, path.matrix, deadline, crash.effect.var)
   } else if (crash.strategy == 'none'){
     activities <- Crash.None(activities)
   } else if (crash.strategy == 'limiting'){
     activities$means <- activities$means * 0
-  } else if (crash.strategy == 'brute'){
+  } else if (crash.strategy == 'enumerate'){
     activities <- Crash.BruteForce(activities, crashing.reserve, path.matrix, deadline, crash.effect.var)
   }
   
@@ -330,12 +331,77 @@ PlotMean <- function(df, variate.str, strategy.names, log_axis = F){
 }
 
 
+PlotMeanRatio <- function(df, variate.str, strategy.names, log_axis = F){
+  # plot the ribbon results
+  # library(reshape)
+  
+  # compute fraction of limiting
+  df$enumerate <- df$enumerate/df$limiting
+  df$critical.path <- df$critical.path/df$limiting
+  df$heuristic <- df$heuristic/df$limiting
+  df$none <- df$none/df$limiting
+  df$limiting <- df$limiting/df$limiting
+  
+  # reshape the df 
+  df2 <- melt(df, id.vars=c("CoV", "num_acts",'num_paths','precedence_density'), variable.name = "strategy", value.name = "prob")
+  # aggregate(df2$prob, by = list(df2[,c('CoV','strategy')]), mean)
+  # mydt.mean <- df2[,lapply(.SD,mean,na.rm=TRUE),by=c(Cov, strategy),.SDcols=colstoavg]
+  df3 <- df2[, lapply(.SD, mean), by = .(CoV, strategy)]
+  
+  
+  # Colorblind palette with black:
+  cbbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+  
+  # colors
+  cols <- cbbPalette[1:length(strategy.names)]
+  names(cols) <- strategy.names
+  # setNames(cols) <- strategy.names
+  ltype <- seq(1, length(strategy.names))
+  names(ltype) <- strategy.names
+  
+  # plot  
+  plt <- ggplot(df3, aes(x = CoV, y = prob, group = strategy, colour = strategy)) + theme_hc()+
+    # stat_summary(aes(group=strategy), fun.y=mean, colour="red", geom="line",group=1)
+    geom_line() + 
+    # stat_summary(data = df, geom="line", fun.y=median, size = 1) + 
+    # scale_colour_discrete(guide = 'none') +
+    # scale_x_discrete(expand=c(0, 1)) +
+    geom_dl(aes(label = strategy), method = list(dl.combine( "last.points"), cex = 0.8), size = 1) 
+  
+  
+  
+  # plotting
+  plt <- plt +
+    xlab("Deadline's Coefficient of Variation") +  #Standard deviation for path completion time') + #Mean path completion time') + #Standard deviation between \n mean path completion times ') + #Inter-path correlation') + #
+    ylab('Probability of Completion Before the Deadline \n as Fraction of Theoretical Limit') +
+    scale_y_continuous(breaks = seq(0,1, by = 0.1)) +
+    scale_x_continuous(breaks = unique(df[[variate.str]])) + #, expand=c(0, 0.2)) +
+    scale_colour_manual(name="",values=cols) +
+    scale_linetype_manual(name = '', values= rep(ltype)) +
+    # expand_limits(0,1.2) + 
+    theme(
+      legend.position = "none",
+      legend.key.width = unit(1,"cm"),
+      text = element_text(size = 10)
+    )   
+  
+  # plot
+  print(plt)
+  
+  # save figure
+  fig.width <- 7  #3.25 # inches
+  fig.height <- fig.width * (sqrt(5)-1)/2 + 0.67
+  ggsave(paste0('fig/', format(Sys.time(), "%Y-%m-%d"),'_', variate.str, '-vary_mean_ratio.pdf'), plot = plt, device = 'pdf', width =  fig.width, height = fig.height , unit = 'in' , dpi = 500) 
+  
+}
+
+
 PlotDifference <- function(df, variate.str, strategy.names, log_axis = F){
   # plot the ribbon results
   
   # reshape the df 
   df$heur_crit <- df$heuristic - df$critical.path
-  df$heur_brute <- df$brute - df$heuristic
+  df$heur_brute <- df$enumerate - df$heuristic
   df$id <- rep(seq(1,dim(df)[1]/length(unique(df$CoV))),each = length(unique(df$CoV)))
   
   # Colorblind palette with black:
@@ -358,12 +424,12 @@ PlotDifference <- function(df, variate.str, strategy.names, log_axis = F){
     # lines
     # geom_line(data = df, aes_string(x = variate.str, y = strategy, group = 'id', color = 'num_paths'), size = 1, alpha = 0.5) +
     # median
-    stat_summary(data = df, aes_string(x = variate.str, y = strategy), geom="line", fun.y=median, size = 1)
+    stat_summary(data = df, aes_string(x = variate.str, y = strategy), geom="line", fun.y=mean, size = 1)
   
   # plotting
   plt <- plt +
     xlab("Deadline's Coefficient of Variation") +  #Standard deviation for path completion time') + #Mean path completion time') + #Standard deviation between \n mean path completion times ') + #Inter-path correlation') + #
-    ylab('Forecast bias when crashing: \n Heuristic vs Critical Path') +
+    ylab('Forecast bias when crashing: \n Modified-PERT vs PERT') +
     coord_cartesian(ylim=c(-0.1,0.1)) +
     # scale_y_continuous(breaks = seq(-10,10, by = 0.05)) +
     scale_x_continuous(breaks = unique(df[[variate.str]])) +
@@ -392,15 +458,15 @@ PlotDifference <- function(df, variate.str, strategy.names, log_axis = F){
   plt <- ggplot() + theme_hc()
   plt <- plt + 
     # ribbon
-    stat_summary(data = df, aes_string(x = variate.str, y = 'heur_brute'), alpha = 0.2, fill = cols[[i]], geom="ribbon", fun.ymin = function(x) quantile(x, 0.25), fun.ymax = function(x) quantile(x, 0.75)) + 
+    stat_summary(data = df, aes_string(x = variate.str, y = 'heur_brute'), alpha = 0.2, fill = cols[[i]], geom="ribbon", fun.ymin = function(x) quantile(x, 0.05), fun.ymax = function(x) quantile(x, 0.95)) + 
     # mean
-    stat_summary(data = df, aes_string(x = variate.str, y = 'heur_brute', color = shQuote(strategy.names[[i]]), linetype = shQuote(strategy.names[[i]])), geom="line", fun.y=median, size = 1)
+    stat_summary(data = df, aes_string(x = variate.str, y = 'heur_brute', color = shQuote(strategy.names[[i]]), linetype = shQuote(strategy.names[[i]])), geom="line", fun.y=mean, size = 1)
   
   
   # plotting
   plt <- plt +
     xlab("Deadline's Coefficient of Variation") +  #Standard deviation for path completion time') + #Mean path completion time') + #Standard deviation between \n mean path completion times ') + #Inter-path correlation') + #
-    ylab('Forecast bias when crashing: \n Brute Force vs Heuristic') +
+    ylab('Forecast bias when crashing: \n Enumeration vs Modified PERT') +
     # ylim(-0.1,0.1) + 
     coord_cartesian(ylim=c(-0.1,0.1)) +
     # scale_y_continuous(breaks = seq(-0.1,0.1, by = 0.1)) +
@@ -429,6 +495,7 @@ PlotDifference <- function(df, variate.str, strategy.names, log_axis = F){
 PlotExplore <- function(){
   
   df$heur_crit <- df$heuristic - df$critical.path
+  df$heur_brute <- df$enumerate - df$critical.path
   df$id <- rep(seq(1,dim(df)[1]/length(unique(df$CoV))),each = length(unique(df$CoV)))
   
   cbbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
@@ -442,10 +509,10 @@ PlotExplore <- function(){
   
   ggplot(df, aes(CoV, num_paths, z = heur_crit, color = heur_crit)) + stat_density2d()
   
-  strategy = 'heur_crit'
+  strategy = 'heur_brute'
   variate.str = 'CoV'
   i = 1
-  ggplot(df[df$num_paths == 4]) + 
+  ggplot(df[df$num_paths == 6]) + 
     # ribbon
     stat_summary(aes_string(x = variate.str, y = strategy), alpha = 0.2, fill = cols[[i]], geom="ribbon", fun.ymin = function(x) quantile(x, 0.05), fun.ymax = function(x) quantile(x, 0.95)) +
     # lines
@@ -495,7 +562,7 @@ PlotForecastBias <- function(df, sim_num, strategy.names, variate.str){
   plt <- plt +
     xlab("Deadline's Coefficient of Variation") +  #Standard deviation for path completion time') + #Mean path completion time') + #Standard deviation between \n mean path completion times ') + #Inter-path correlation') + #
     ylab('Forecast Bias When \n Ignoring Deadline Uncertainty') +
-    scale_y_continuous(breaks = seq(0,1, by = 0.1)) +
+    coord_cartesian(ylim=c(0,0.3)) +
     scale_x_continuous(breaks = unique(df[[variate.str]])) +
     scale_colour_manual(name="",values=cols) +
     scale_linetype_manual(name = '', values= rep(ltype)) +
@@ -529,6 +596,7 @@ Crash.None <- function(activities){
   
   return(activities)
 }
+
 
 Crash.CriticalPath <- function(activities, crashing.reserve, path.matrix, deadline, crash.effect.var){
   # Crash strategy:
@@ -571,6 +639,113 @@ Crash.CriticalPath <- function(activities, crashing.reserve, path.matrix, deadli
   return(activities)
 }
 
+
+Crash.Heuristic <- function(activities, crashing.reserve, path.matrix, deadline, crash.effect.var){
+  # Crash strategy:
+  # Crash the activities on the critical path
+  
+  path.num <- nrow(path.matrix)
+  crashed.activities <- c()
+  
+  while (crashing.reserve > 0){
+    
+    # Calculate path properties
+    path.properties <- CalculatePathMeanVariance(path.matrix, activities, path.num)
+    
+    # calculate probability exceeding deadline
+    path.mean.max <- max(unlist(path.properties$mean))
+    difference.mean <- unlist(path.properties$mean) - deadline$mean
+    difference.sqrt <- sqrt(unlist(path.properties$variance) + deadline$variance)
+    path.properties$late <- pnorm(q = 0, mean = difference.mean, sd = difference.sqrt, lower.tail = F)
+    
+    # identify the critical path 
+    # ignore paths with mean 0, because they cannot be crashed further
+    critical.path.index <- which.max(path.properties$late * (path.properties$mean>0))
+    
+    # identify activities on the critical path
+    critical.path.activities <- which(path.matrix[critical.path.index,]==1)
+    
+    # remove crashed paths from consideration
+    critical.path.activities <- critical.path.activities[! critical.path.activities %in% crashed.activities]
+    
+    # activity to crash is the one on the critical path with the largest mean
+    # activity to crash is the one with longest tail above largest mean
+    activity.mean <- activities$means[critical.path.activities]
+    activity.mean.max <- max(activity.mean)
+    activity.sd <- sqrt(activities$variance[critical.path.activities])
+    prob.largest <- pnorm(0, mean = activity.mean - activity.mean.max, sd = activity.sd, lower.tail = F)
+    crash.activity <- critical.path.activities[which.max(prob.largest)]
+    
+    # crash the activity (reduce it's mean completion time by 100% or what's left in our crash budget)
+    crash.reduction <- min(activities$means[crash.activity], crashing.reserve)
+    # calculate the activities variances resulting from the crash
+    activities$variances[crash.activity] <- (activities$cov[crash.activity] * (activities$means[crash.activity] - crash.reduction*crash.effect.var))^2
+    # reduce the mean by the crash
+    activities$means[crash.activity] <- activities$means[crash.activity] - crash.reduction
+    
+    # this reduces our crashing reserve
+    crashing.reserve <- crashing.reserve - crash.reduction
+    
+    # add crashed path to list, cannot re-crash a path
+    crashed.activities <- c(crashed.activities, crash.activity)
+  }
+  
+  return(activities)
+}
+
+
+Crash.Heuristic.2 <- function(activities, crashing.reserve, path.matrix, deadline, crash.effect.var){
+  # Crash strategy:
+  # Crash the activities on the critical path
+  
+  path.num <- nrow(path.matrix)
+  crashed.activities <- c()
+  
+  while (crashing.reserve > 0){
+    
+    # Calculate path properties
+    path.properties <- CalculatePathMeanVariance(path.matrix, activities, path.num)
+    
+    # calculate probability exceeding largest mean
+    path.mean.max <- max(unlist(path.properties$mean))
+    difference.mean <- unlist(path.properties$mean) - path.mean.max
+    difference.sqrt <- sqrt(unlist(path.properties$variance))
+    path.properties$prob_late <- pnorm(q = 0, mean = difference.mean, sd = difference.sqrt, lower.tail = F)
+    
+    # identify the critical path
+    # critical.path.index <- which.max(path.properties$mean)
+    critical.path.index <- which.max(path.properties$prob_late)
+    
+    # identify activities on the critical path
+    critical.path.activities <- which(path.matrix[critical.path.index,]==1)
+    
+    # remove crashed paths from consideration
+    critical.path.activities <- critical.path.activities[! critical.path.activities %in% crashed.activities]
+    
+    # activity to crash is the one on the critical path with the largest mean
+    # activity to crash is the one with longest tail above largest mean
+    activity.mean <- activities$means[critical.path.activities]
+    activity.mean.max <- max(activity.mean)
+    activity.sd <- sqrt(activities$variance[critical.path.activities])
+    prob.largest <- pnorm(0, mean = activity.mean - activity.mean.max, sd = activity.sd, lower.tail = F)
+    crash.activity <- critical.path.activities[which.max(prob.largest)]
+    
+    # crash the activity (reduce it's mean completion time by 100% or what's left in our crash budget)
+    crash.reduction <- min(activities$means[crash.activity], crashing.reserve)
+    # calculate the activities variances resulting from the crash
+    activities$variances[crash.activity] <- (activities$cov[crash.activity] * (activities$means[crash.activity] - crash.reduction*crash.effect.var))^2
+    # reduce the mean by the crash
+    activities$means[crash.activity] <- activities$means[crash.activity] - crash.reduction
+    
+    # this reduces our crashing reserve
+    crashing.reserve <- crashing.reserve - crash.reduction
+    
+    # add crashed path to list, cannot re-crash a path
+    crashed.activities <- c(crashed.activities, crash.activity)
+  }
+  
+  return(activities)
+}
 
 Crash.Optimal <- function(activities, crashing.reserve, path.matrix, deadline, crash.effect.var){
   # Crash strategy:
@@ -640,25 +815,30 @@ WeightedSum <- function(act.idx, path.marginal.completion.prob, path.matrix, pro
 CalculateMarginalEffect <- function(path.idx, epsi, deadline, project){
   
   # subtract epsi
-  project.less <- project
-  project.less$properties$mean[[path.idx]] <- project.less$properties$mean[[path.idx]] - epsi
+  # project.less <- project
+  # project.less$properties$mean[[path.idx]] <- project.less$properties$mean[[path.idx]] - epsi
+  # 
+  # # add epsi
+  # project.add <- project
+  # project.add$properties$mean[[path.idx]] <- project.add$properties$mean[[path.idx]] + epsi
   
-  # add epsi
-  project.add <- project
-  project.add$properties$mean[[path.idx]] <- project.add$properties$mean[[path.idx]] + epsi
+  # difference mean and sd
+  path.mean.dif <- project$properties$mean[[path.idx]] - deadline$mean
+  path.sd <- sqrt(project$properties$variance[[path.idx]] + deadline$variance)
   
   # Determine probability of on-time completion with added epsi
-  prob.ontime.added <- CalculateCompletionProbability(project.add, deadline)
+  prob.ontime.added <- pnorm(q = 0, mean = path.mean.dif + epsi, sd = path.sd)
+  # prob.ontime.added <- CalculateCompletionProbability(project.add, deadline)
   
   # Determine probability of on-time completion with added epsi
-  prob.ontime.less <- CalculateCompletionProbability(project.less, deadline)
+  prob.ontime.less <- pnorm(q = 0, mean = path.mean.dif - epsi, sd = path.sd) #CalculateCompletionProbability(project.less, deadline)
   
   # difference
   first.dif <- (prob.ontime.less - prob.ontime.added)/(2*epsi)
   first.dif[first.dif < 0] <- 0
   
   # first difference divided by standard deviation of path
-  marginal.complete.prob <- first.dif #/sqrt(project$properties$variance[[path.idx]])
+  marginal.complete.prob <- first.dif#/sqrt(project$properties$variance[[path.idx]])
   
   return(marginal.complete.prob)
 }
@@ -696,7 +876,6 @@ CalculateMarginalEffectActivity <- function(activity.idx, epsi, deadline, projec
 }
 
 
-
 plotCrashEffect <- function(project, deadline){
   # how does reducing the mean change the probability of completion
   project <- CalculatePathProperties(path.matrix, activities)
@@ -715,7 +894,6 @@ plotCrashEffect <- function(project, deadline){
   poc <- lapply(reduce.path.mean, function(reduce) CalcPocCrash(reduce, project, deadline, path.idx))
   plot(reduce.path.mean, poc)
 }
-
 
 
 Crash.BruteForce <- function(activities, crashing.reserve, path.matrix, deadline, crash.effect.var){
