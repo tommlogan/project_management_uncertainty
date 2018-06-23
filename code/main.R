@@ -39,7 +39,7 @@ main <- function(){
   # init results dataframe
   df <- NULL
   # loop activity and precedence density
-  sim_num = 1000
+  sim_num = 20
   for (i in seq(1,sim_num)){
     activity.num <- sample(5:10,1)
     link.prob <- runif(1, 0.05, 0.4)
@@ -279,6 +279,7 @@ PlotMean <- function(df, variate.str, strategy.names, log_axis = F){
   # plot the ribbon results
   # library(reshape)
   # reshape the df 
+  df$limiting <- NULL
   df2 <- melt(df, id.vars=c("CoV", "num_acts",'num_paths','precedence_density'), variable.name = "strategy", value.name = "prob")
   # aggregate(df2$prob, by = list(df2[,c('CoV','strategy')]), mean)
   # mydt.mean <- df2[,lapply(.SD,mean,na.rm=TRUE),by=c(Cov, strategy),.SDcols=colstoavg]
@@ -336,11 +337,11 @@ PlotMeanRatio <- function(df, variate.str, strategy.names, log_axis = F){
   # library(reshape)
   
   # compute fraction of limiting
-  df$enumerate <- df$enumerate/df$limiting
-  df$critical.path <- df$critical.path/df$limiting
-  df$heuristic <- df$heuristic/df$limiting
-  df$none <- df$none/df$limiting
-  df$limiting <- df$limiting/df$limiting
+  df$critical.path <- df$critical.path/df$enumerate
+  df$heuristic <- df$heuristic/df$enumerate
+  df$none <- df$none/df$enumerate
+  df$limiting <- NULL #df$limiting/df$limiting
+  df$enumerate <- df$enumerate/df$enumerate
   
   # reshape the df 
   df2 <- melt(df, id.vars=c("CoV", "num_acts",'num_paths','precedence_density'), variable.name = "strategy", value.name = "prob")
@@ -373,7 +374,7 @@ PlotMeanRatio <- function(df, variate.str, strategy.names, log_axis = F){
   # plotting
   plt <- plt +
     xlab("Deadline's Coefficient of Variation") +  #Standard deviation for path completion time') + #Mean path completion time') + #Standard deviation between \n mean path completion times ') + #Inter-path correlation') + #
-    ylab('Probability of Completion Before the Deadline \n as Fraction of Theoretical Limit') +
+    ylab('Probability of Completion Before the Deadline \n as Fraction of Optimal by Enumeration') +
     scale_y_continuous(breaks = seq(0,1, by = 0.1)) +
     scale_x_continuous(breaks = unique(df[[variate.str]])) + #, expand=c(0, 0.2)) +
     scale_colour_manual(name="",values=cols) +
