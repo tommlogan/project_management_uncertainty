@@ -24,10 +24,10 @@
   
   # assign activity mean and variance
   activity.means <- runif(activity.num, 0, 1)
-  # activity.coefvariation <- runif(activity.num, 0, 1) #rkumar(activity.num, 5, 1) # rtriangle(activity.num, 0, 2, 2)#
-  # activity.variances <- (activity.coefvariation * activity.means)^2
-  activity.variances <- rexp(activity.num, 1.5) #  # abs(rnorm(activity.num, mean = 0.5, sd = 0.1)) #
-  activity.coefvariation <- sqrt(activity.variances)/activity.means
+  activity.coefvariation <- runif(activity.num, 0, 1) #rkumar(activity.num, 5, 1) # rtriangle(activity.num, 0, 2, 2)#
+  activity.variances <- (activity.coefvariation * activity.means)^2
+  # activity.variances <- rexp(activity.num, 1.5) #  # abs(rnorm(activity.num, mean = 0.5, sd = 0.1)) #
+  # activity.coefvariation <- sqrt(activity.variances)/activity.means
   activities <- list(means = activity.means, variances = activity.variances, cov = activity.coefvariation)
   
   return(list(path.matrix = path.matrix, activities = activities))
