@@ -1,4 +1,4 @@
-cost <- 0.02
+cost <- 0.01
 main <- function(){
   # calculate the affect of uncertainty on project completion time estimation and crashing strategies
   # 1. randomly generate projects
@@ -29,11 +29,10 @@ main <- function(){
   library(ggthemes)
   library(RColorBrewer)
   library(directlabels)
-  # library(matrixcalc)
   
   
   # import functions
-  source('code/generate_projects_B.R')
+  source('code/generate_projects.R')
   source('code/crashing_strategies_reward.R')
   
   # init results dataframe
@@ -133,7 +132,7 @@ CalcCrashCompletionProb <- function(crash.strategy, activities, crashing.reserve
     # ret <- Crash.Optimal(activities, crashing.reserve, path.matrix, deadline, crash.effect.var, deadline.variance = F)
     crashed.acts = ret$crashed
     activities = ret$acts
-  } else if (crash.strategy == 'Heuristic'){
+  } else if (crash.strategy == 'modified.PERT'){
     ret <- Crash.Heuristic(activities, crashing.reserve, path.matrix, deadline, crash.effect.var, deadline.variance=T)
     # ret <- Crash.Optimal(activities, crashing.reserve, path.matrix, deadline, crash.effect.var, deadline.variance = T)
     crashed.acts = ret$crashed
@@ -142,7 +141,7 @@ CalcCrashCompletionProb <- function(crash.strategy, activities, crashing.reserve
     ret <- Crash.BruteForce(activities, crashing.reserve, path.matrix, deadline, crash.effect.var, deadline.variance=F)
     crashed.acts = ret$crashed
     activities = ret$acts
-  } else if (crash.strategy == 'Enumeration'){
+  } else if (crash.strategy == 'enumeration'){
     ret <- Crash.BruteForce(activities, crashing.reserve, path.matrix, deadline, crash.effect.var, deadline.variance=T)
     # ret <- Crash.criticalOrder(activities, crashing.reserve, path.matrix, deadline, crash.effect.var, deadline.variance = T)
     crashed.acts = ret$crashed
@@ -405,6 +404,7 @@ PlotMean <- function(df, variate.str, strategy.names, log_axis = F){
     # scale_x_continuous(breaks = seq(0,100,by=1)) + 
     scale_colour_manual(name="",values=cols) +
     scale_linetype_manual(name = '', values= rep(ltype)) +
+    coord_cartesian(ylim=c(0,0.5)) +
     # expand_limits(0,1.2) + 
     theme(
       legend.position = "bottom",
@@ -540,6 +540,7 @@ PlotScheduleRisk <- function(df, variate.str, strategy.names, log_axis = F){
     ylab('Schedule Risk') +
     scale_y_continuous(breaks = seq(0,1, by = 0.1)) +
     scale_x_continuous(breaks = unique(df[[variate.str]])) + #, expand=c(0, 0.2)) +
+    coord_cartesian(ylim=c(0,0.5)) +
     # scale_x_continuous(breaks = seq(0,100,by=1)) + 
     scale_colour_manual(name="",values=cols) +
     scale_linetype_manual(name = '', values= rep(ltype)) +
@@ -674,8 +675,8 @@ PlotDifference <- function(df, variate.str, strategy.names, log_axis = F){
   # plotting
   plt <- plt +
     xlab("Deadline's Coefficient of Variation") +  #Standard deviation for path completion time') + #Mean path completion time') + #Standard deviation between \n mean path completion times ') + #Inter-path correlation') + #
-    ylab(bquote(atop(Delta ~ plain("Schedule Risk:"), 'Modified-PERT vs PERT'))) +
-    # coord_cartesian(ylim=c(-0.1,0.1)) +
+    ylab("Difference in Schedule Risk: \n PERT minus ModifiedPERT") +
+    coord_cartesian(ylim=c(-0.05,0.25)) +
     # scale_y_continuous(breaks = seq(-10,10, by = 0.05)) +
     # scale_x_continuous(breaks = unique(df[[variate.str]])) +
     scale_colour_manual(name="",values=cols) +
@@ -711,9 +712,9 @@ PlotDifference <- function(df, variate.str, strategy.names, log_axis = F){
   # plotting
   plt <- plt +
     xlab("Deadline's Coefficient of Variation") +  #Standard deviation for path completion time') + #Mean path completion time') + #Standard deviation between \n mean path completion times ') + #Inter-path correlation') + #
-    ylab(bquote(atop(Delta ~ plain("Schedule Risk:"), 'Enumeration vs Modified-PERT'))) +
+    ylab("Difference in Schedule Risk: \n ModifiedPERT minus Enumeration") +
     # ylim(-0.1,0.1) + 
-    coord_cartesian(ylim=c(-0.1,0.1)) +
+    coord_cartesian(ylim=c(-0.05,0.25)) +
     # scale_y_continuous(breaks = seq(-0.1,0.1, by = 0.1)) +
     # scale_x_continuous(breaks = unique(df[[variate.str]])) +
     scale_colour_manual(name="",values=cols) +

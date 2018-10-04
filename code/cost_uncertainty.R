@@ -359,6 +359,7 @@ PlotRibbon <- function(df, variate.str, strategy.names, log_axis = F){
     scale_x_continuous(breaks = unique(df[[variate.str]])) +
     scale_colour_manual(name="",values=cols) +
     scale_linetype_manual(name = '', values= rep(ltype)) +
+    coord_cartesian(ylim=c(0,0.5)) +
     theme(
       legend.position = "bottom",
       legend.key.width = unit(1,"cm"),
@@ -499,6 +500,7 @@ PlotReward <- function(df, variate.str, strategy.names, log_axis = F){
     # scale_x_continuous(breaks = seq(0,100,by=1)) + 
     scale_colour_manual(name="",values=cols) +
     scale_linetype_manual(name = '', values= rep(ltype)) +
+    coord_cartesian(ylim=c(0,0.25)) +
     # expand_limits(0,1.2) + 
     theme(
       legend.position = "bottom",
