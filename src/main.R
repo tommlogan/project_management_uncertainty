@@ -35,8 +35,8 @@ main <- function(){
   
   
   # import functions
-  source('code/generate_projects_B.R')
-  #source('code/crashing_strategies.R')
+  source('src/generate_projects.R')
+
   
   # init results dataframe
   df <- NULL
@@ -63,7 +63,7 @@ main <- function(){
     deadline$mean <- qnorm(deadline$critical.path.percentile, mean = path.properties$mean[[critical.path.index]], sd = sqrt(path.properties$variance[[critical.path.index]]))
     
     # Crash strategies 
-    strategy.names <- c('ignored', 'considered') #' 's.2b', 's.4a', 's.4b', 's.5'
+    strategy.names <- c('ignored', 'considered') 
     
     # loop through the deadline's coefficient of variation, calculate probability of on-time completion
     results <- pblapply(deadline$coeff.variation, function(CoV) VaryCoefVariation(CoV, deadline, strategy.names, path.matrix, activities, link.prob, crashing.reserve, crash.effect.var), cl = number.cores)
@@ -132,18 +132,6 @@ CalcCrashCompletionProb <- function(crash.strategy, activities, crashing.reserve
   
   if (crash.strategy == 's.1'){
     activities <- Crash.None(activities)
-  # } else if (crash.strategy == 's.2a') {
-  #   activities <- Crash.CriticalPath.2a(activities, crashing.reserve, path.matrix, deadline, crash.effect.var)
-  # } else if (crash.strategy == 's.2b') {
-  #   activities <- Crash.CriticalPath.2b(activities, crashing.reserve, path.matrix, deadline, crash.effect.var)
-  # } else if (crash.strategy == 's.3a'){
-  #   ret <- Crash.Optimal(activities, crashing.reserve, path.matrix, deadline, crash.effect.var, ignore.deadline = T) #Crash.Heuristic(activities, crashing.reserve, path.matrix, deadline, crash.effect.var)
-  #   crashed.acts = ret$crashed
-  #   activities = ret$acts
-  # } else if (crash.strategy == 's.3b'){
-  #   ret <- Crash.Optimal(activities, crashing.reserve, path.matrix, deadline, crash.effect.var, ignore.deadline = F) #Crash.Heuristic(activities, crashing.reserve, path.matrix, deadline, crash.effect.var)
-  #   crashed.acts = ret$crashed
-  #   activities = ret$acts
   } else if (crash.strategy == 'ignored'){
     ret <- Crash.BruteForce(activities, crashing.reserve, path.matrix, deadline, crash.effect.var, deadline.variance = F)
     crashed.acts = ret$crashed
@@ -152,17 +140,6 @@ CalcCrashCompletionProb <- function(crash.strategy, activities, crashing.reserve
     ret <- Crash.BruteForce(activities, crashing.reserve, path.matrix, deadline, crash.effect.var, deadline.variance = T)
     crashed.acts = ret$crashed
     activities = ret$acts
-  # } else if (crash.strategy == 's.5'){
-  #   activities$means <- activities$means * 0
-  # } else if (crash.strategy == 's.6a'){
-  #   activities <- Crash.Heuristic(activities, crashing.reserve, path.matrix, deadline, crash.effect.var, ignore.deadline = T)
-  # } else if (crash.strategy == 's.6b'){
-  #   activities <- Crash.Heuristic(activities, crashing.reserve, path.matrix, deadline, crash.effect.var, ignore.deadline = F)
-  # } else if (crash.strategy == 's.7'){
-  #   deadline.variance = FALSE
-  #   ret <- Crash.BruteForce(activities, crashing.reserve, path.matrix, deadline, crash.effect.var, deadline.variance = T)
-  #   crashed.acts = ret$crashed
-  #   activities = ret$acts
   }
   
   
@@ -365,10 +342,7 @@ PlotRibbon <- function(df, variate.str, strategy.names, log_axis = F){
       legend.key.width = unit(1,"cm"),
       text = element_text(size = 10)
     )   
-  # scale_colour_discrete(guide = 'none') +
-  # scale_x_discrete(expand=c(0, 1)) +
-  # geom_dl(aes(label=strategy), method = list(dl.combine("first.points", "last.points"), cex = 0.8))
-  
+ 
   if (log_axis){
     plt <- plt + scale_x_continuous(trans='log10', breaks = unique(df$x.list))
   }
@@ -387,10 +361,6 @@ PlotRibbon <- function(df, variate.str, strategy.names, log_axis = F){
 
 PlotScheduleRisk <- function(df, variate.str, strategy.names, log_axis = F){
   # plot the probability of running late
-  
-  # calculate the variance ratio
-  # df$VR <- df$DV/df$PV
-  # df$CoV <- df$VR # hack
   
   # reshape the df 
   vars.important <- c("CoV", "num_acts",'num_paths','precedence_density')

@@ -2,18 +2,11 @@
 Tom M Logan  
 www.tomlogan.co.nz
 
-## Background
-
 ## Files
 
     |- main.R
         |- generate_projects.R
-        |- compare_strategies.R
-            |- determine_project_properties.R
-            |- calculate_completion_probability.R
-                |- calculate_true_completion.R
-
-
+      
 ## Steps
 
 1. main
@@ -24,15 +17,10 @@ www.tomlogan.co.nz
         * variance of deadline
         * baseline deadline (?)
     ii. generate projects (calls `generate_projects.R`)
-    iii. compare crash strategies (call `compare_strategies.R`)
+    iii. compare crash strategies
     iv. record result
     v. repeat
 2. generate projects
-    i. generate matrix paths and activities (a 1 indicates that an activity, column, is in the path, row)
-    i. find all paths in the directed acyclic graph
-    i. remove paths which are subpaths of other paths
-    i. draw activity mean (random uniform variable (0,1)) and variance (exponential random variable (4))
-2. generate projects (B)
     i. generate a binary upper triangular matrix using a parameter for link density
     i. remove paths which are subpaths of other paths
     i. draw activity mean (random uniform variable (0,1)) and variance (exponential random variable (4))
@@ -46,9 +34,7 @@ www.tomlogan.co.nz
         * calculate variance
         * determine covariance
 5. on-time completion probability (call `CalculateCompletionProbability` in `main.R`)
-    *  
-    * this is either the `calc_acpa` function from the modified PERT paper or the true multivariate normal completion time
-    * $P(max(G_1, .., G_n) \leq 0)$ where $G_i$ is the difference between the completion time of path $i$ and the deadline.
+
 
 ## Crashing rules:
 1. Crash the critical path
@@ -73,3 +59,4 @@ Repeat until crashing reserve is depleted.
   Crash the top activities until the crashing reserve is spent.
 
 #### Citation:
+
